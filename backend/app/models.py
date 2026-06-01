@@ -11,7 +11,8 @@ class IngestRequest(BaseModel):
 class QueryRequest(BaseModel):
     query: str
     top_k: int = 5
-
+    source_name: Optional[str] = None
+    filename: Optional[str] = None
 
 class DocumentChunk(BaseModel):
     id: str

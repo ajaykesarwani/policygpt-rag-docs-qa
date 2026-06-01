@@ -1,4 +1,6 @@
-﻿﻿import React, { useState } from "react";
+﻿﻿"use client";
+
+import React, { useState } from "react";
 
 type ContextChunk = {
   id: string;
@@ -32,6 +34,7 @@ export default function Chat() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query, top_k: 5 }),
       });
+
       const text = await resp.text();
       let data: any = {};
       try {
@@ -58,11 +61,11 @@ export default function Chat() {
         <div>
           <h2 className="panel__title">Ask a question</h2>
           <p className="panel__hint">
-            Queries are answered using only your ingested documents. Check the
-            context section to see which snippets were used.
+            Queries are answered using only your ingested documents. Check the context section to see which snippets were used.
           </p>
         </div>
       </div>
+
       <div className="panel__body">
         <form onSubmit={handleAsk} style={{ marginBottom: 10 }}>
           <div className="field-group">
@@ -72,7 +75,7 @@ export default function Chat() {
               onChange={(e) => setQuery(e.target.value)}
               className="field-group__textarea"
               rows={3}
-              placeholder="E.g. What does our vacation policy say about carry-over days?"
+              placeholder="Example: What does our vacation policy say about carry-over days?"
             />
           </div>
           <button
@@ -92,15 +95,14 @@ export default function Chat() {
               <div className="field-group__label">Answer</div>
               <div className="chat-answer">{response.answer}</div>
             </div>
+
             <div className="chat-context">
               <div className="field-group__label">Context used</div>
               {response.context.map((c) => (
                 <div className="chat-context__item" key={c.id}>
                   <div className="chat-context__meta">
-                    score={c.score.toFixed(3)}{" "}
-                    {c.metadata?.source
-                      ? ` · source=${c.metadata.source}`
-                      : ""}
+                    score={c.score.toFixed(3)}
+                    {c.metadata?.source ? ` · source=${c.metadata.source}` : ""}
                   </div>
                   <div>{c.text}</div>
                 </div>

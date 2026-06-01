@@ -8,7 +8,7 @@ from .models import IngestRequest, QueryRequest, QueryResponse, DocumentChunk
 from .ingestion import ingest_texts
 from .rag_pipeline import rag_query
 from .logging_config import configure_logging
-
+from .rag_pipeline import reset_vector_store
 
 configure_logging()
 app = FastAPI(title="RAG Document QA", version="1.0.0")
@@ -45,11 +45,31 @@ def ingest(req: IngestRequest, settings: Settings = Depends(get_settings)):
     return {"status": "ok", **result}
 
 
+# @app.post("/query", response_model=QueryResponse)
+# def query_rag(req: QueryRequest):
+#     answer, chunks = rag_query(req.query, top_k=req.top_k)
+#     return QueryResponse(answer=answer, context=chunks)
+
 @app.post("/query", response_model=QueryResponse)
 def query_rag(req: QueryRequest):
-    answer, chunks = rag_query(req.query, top_k=req.top_k)
-    return QueryResponse(answer=answer, context=chunks)
+    where = None
 
+    if req.source_name and req.filename:
+        where = {
+            "$and": [
+                {"source": req.source_name},
+                {"filename": req.filename},
+            ]
+        }
+    elif req.source_name:
+        where = {"source": req.source_name}
+    elif req.filename:
+        where = {"filename": req.filename}
+    else:
+        where = None  # do not send an empty dict
+
+    answer, chunks = rag_query(req.query, top_k=req.top_k, where=where)
+    return QueryResponse(answer=answer, context=chunks)
 
 
 # ... existing imports and app ...
@@ -86,3 +106,12 @@ async def upload_file(source_name: str, file: UploadFile = File(...)):
     )
 
     return {"status": "ok", "ingested_chunks": ingest_result["ingested_chunks"]}
+
+@app.post("/admin/reset")
+def reset_knowledge():
+    """
+    Danger: clears all stored documents/embeddings.
+    Intended for dev/admin use.
+    """
+    reset_vector_store()
+    return {"status": "ok", "message": "Vector store reset; all documents deleted."}

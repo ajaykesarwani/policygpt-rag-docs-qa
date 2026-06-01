@@ -11,7 +11,7 @@
   --success: #4ade80;
   --radius-lg: 16px;
   --radius-md: 10px;
-  --shadow-soft: 0 18px 45px rgba(15, 23, 42, 0.7);
+  --shadow-soft: 0 14px 30px rgba(15, 23, 42, 0.55);
 }
 
 *,
@@ -24,7 +24,8 @@ body {
   margin: 0;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
-  background: radial-gradient(circle at top, #1e293b 0, #020617 40%, #000 100%);
+  /* Calmer, product-like background */
+  background: #020617;
   color: var(--text-main);
 }
 
@@ -59,13 +60,13 @@ body {
 
 .app-header__badge {
   display: inline-flex;
-  flex-direction: column;      
+  flex-direction: column;
   align-items: flex-start;
   gap: 2px;
   font-size: 11px;
-  text-transform: none;        
-  letter-spacing: 0.03em;      
-  padding: 5px 10px;
+  text-transform: none;
+  letter-spacing: 0.03em;
+  padding: 6px 11px;
   border-radius: 999px;
   background: var(--accent-soft);
   color: var(--accent);
@@ -77,21 +78,23 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.12em;
 }
+
 .app-header__badge-tagline {
   color: var(--text-muted);
 }
 
 .app-header__title {
-  font-size: 26px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  margin: 10px 0 6px;
+  font-size: 32px;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+  margin: 12px 0 8px;
 }
 
 .app-header__subtitle {
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text-muted);
-  max-width: 520px;
+  max-width: 560px;
+  line-height: 1.5;
 }
 
 .app-header__pill {
@@ -99,8 +102,21 @@ body {
   color: var(--text-muted);
   border-radius: 999px;
   border: 1px solid var(--border-subtle);
-  padding: 6px 10px;
+  padding: 6px 8px;
   background: rgba(15, 23, 42, 0.7);
+  display: inline-flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+/* Small tech stack chips you can use inside the pill */
+.tech-pill {
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border-subtle);
+  background: rgba(15, 23, 42, 0.8);
+  color: var(--text-muted);
 }
 
 /* Main grid */
@@ -119,26 +135,20 @@ body {
 
 /* Panel */
 
-/* .panel {
-  border-radius: var(--radius-lg);
-  border: 1px solid rgba(148, 163, 184, 0.18);
-  background: radial-gradient(circle at top left, #111827 0, #020617 48%);
-  box-shadow: var(--shadow-soft);
-  padding: 16px 16px 18px;
-} */
-
 .panel {
   border-radius: var(--radius-lg);
-  border: 1px solid rgba(148, 163, 184, 0.18);
-  background: radial-gradient(circle at top left, #111827 0, #020617 48%);
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: radial-gradient(circle at top left, #020617 0, #020617 55%);
   box-shadow: var(--shadow-soft);
-  padding: 16px 16px 18px;
-  transition: transform 0.08s ease, box-shadow 0.12s ease;
+  padding: 18px 18px 20px;
+  transition: transform 0.08s ease, box-shadow 0.12s ease,
+    border-color 0.12s ease;
 }
 
 .panel:hover {
   transform: translateY(-1px);
-  box-shadow: 0 20px 48px rgba(15, 23, 42, 0.9);
+  border-color: rgba(148, 163, 184, 0.35);
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.7);
 }
 
 .panel--upload {
@@ -153,12 +163,12 @@ body {
 }
 
 .panel__title {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
 }
 
 .panel__hint {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-muted);
 }
 
@@ -173,12 +183,13 @@ body {
   display: flex;
   flex-direction: column;
   gap: 3px;
-  font-size: 11px;
+  font-size: 12px;
   margin-bottom: 10px;
 }
 
 .field-group__label {
   color: var(--text-main);
+  font-size: 12px;
 }
 
 .field-group__input,
@@ -187,9 +198,14 @@ body {
   border: 1px solid var(--border-subtle);
   background: #020617;
   color: var(--text-main);
-  padding: 6px 8px;
-  font-size: 12px;
+  padding: 7px 9px;
+  font-size: 13px;
   resize: vertical;
+}
+
+.field-group__input:hover,
+.field-group__textarea:hover {
+  border-color: rgba(148, 163, 184, 0.4);
 }
 
 .field-group__input:focus,
@@ -199,18 +215,45 @@ body {
   box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.45);
 }
 
+/* Drag-and-drop upload area (use for files) */
+
+.upload-dropzone {
+  border-radius: var(--radius-md);
+  border: 1px dashed rgba(148, 163, 184, 0.45);
+  background: rgba(15, 23, 42, 0.9);
+  padding: 12px 10px;
+  font-size: 12px;
+  color: var(--text-muted);
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.12s ease, background-color 0.12s ease;
+}
+
+.upload-dropzone:hover {
+  border-color: var(--accent);
+  background: rgba(15, 23, 42, 0.95);
+}
+
+/* Buttons */
+
 .button {
   border: none;
   border-radius: 999px;
-  padding: 7px 16px;
+  padding: 8px 18px;
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
   transition: transform 0.08s ease, box-shadow 0.12s ease,
     background-color 0.12s ease;
+}
+
+.button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .button--primary {
@@ -232,7 +275,20 @@ body {
 .button--primary:disabled {
   background: #374151;
   box-shadow: none;
-  cursor: default;
+  cursor: not-allowed;
+  opacity: 0.8;
+}
+
+.button--secondary {
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px solid var(--border-subtle);
+}
+
+.button--danger {
+  background: rgba(248, 113, 113, 0.12);
+  color: var(--danger);
+  border: 1px solid rgba(248, 113, 113, 0.6);
 }
 
 /* Status badges */
@@ -254,11 +310,11 @@ body {
 
 .chat-answer {
   border-radius: var(--radius-md);
-  border: 1px solid rgba(148, 163, 184, 0.25);
-  background: radial-gradient(circle at top left, #020617 0, #020617 50%);
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: #020617;
   padding: 10px 11px;
   font-size: 12px;
-  line-height: 1.5;
+  line-height: 1.6;
   white-space: pre-wrap;
 }
 
