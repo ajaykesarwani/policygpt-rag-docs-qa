@@ -44,10 +44,25 @@ def ingest(req: IngestRequest, settings: Settings = Depends(get_settings)):
     result = ingest_texts(req.source_name, req.texts, req.metadata or {})
     return {"status": "ok", **result}
 
-
 # @app.post("/query", response_model=QueryResponse)
 # def query_rag(req: QueryRequest):
-#     answer, chunks = rag_query(req.query, top_k=req.top_k)
+#     where = None
+
+#     if req.source_name and req.filename:
+#         where = {
+#             "$and": [
+#                 {"source": req.source_name},
+#                 {"filename": req.filename},
+#             ]
+#         }
+#     elif req.source_name:
+#         where = {"source": req.source_name}
+#     elif req.filename:
+#         where = {"filename": req.filename}
+#     else:
+#         where = None  # do not send an empty dict
+
+#     answer, chunks = rag_query(req.query, top_k=req.top_k, where=where)
 #     return QueryResponse(answer=answer, context=chunks)
 
 @app.post("/query", response_model=QueryResponse)
@@ -66,9 +81,14 @@ def query_rag(req: QueryRequest):
     elif req.filename:
         where = {"filename": req.filename}
     else:
-        where = None  # do not send an empty dict
+        where = None
 
-    answer, chunks = rag_query(req.query, top_k=req.top_k, where=where)
+    answer, chunks = rag_query(
+        req.query,
+        top_k=req.top_k,
+        where=where,
+        retrieval_strategy=req.retrieval_strategy,  # NEW
+    )
     return QueryResponse(answer=answer, context=chunks)
 
 

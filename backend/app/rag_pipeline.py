@@ -6,7 +6,6 @@ from rank_bm25 import BM25Okapi  # new
 from .config import get_settings
 from .models import DocumentChunk
 from .local_embeddings import LocalEmbeddingFunction
-from nltk.tokenize import word_tokenize  # or a simple split if you prefer
 
 settings = get_settings()
 
@@ -28,32 +27,76 @@ _collection = _client.get_or_create_collection(
 # We build a BM25 index over all docs currently in the collection.
 # For a more advanced system, you'd keep this in sync with ingestion.
 
-def _build_bm25_index() -> Tuple[BM25Okapi, List[Dict], List[str]]:
+# def _build_bm25_index() -> Tuple[BM25Okapi, List[Dict], List[str]]:
+#     """
+#     Build BM25 index from all docs in the Chroma collection.
+#     Returns:
+#       - BM25Okapi instance
+#       - metadatas list (aligned with corpus)
+#       - documents list (aligned with corpus)
+#     """
+#     all_docs = _collection.get(include=["documents", "metadatas"])
+#     documents = all_docs["documents"]
+#     metadatas = all_docs["metadatas"]
+
+#     # Tokenize each document for BM25
+#     tokenized_corpus = []
+#     for doc in documents:
+#         # You can use a very simple tokenizer if you don't want nltk:
+#         # tokens = doc.lower().split()
+#         tokens = word_tokenize(doc.lower())
+#         tokenized_corpus.append(tokens)
+
+#     bm25 = BM25Okapi(tokenized_corpus)
+#     return bm25, metadatas, documents
+
+
+# _bm25_index, _bm25_metadatas, _bm25_docs = _build_bm25_index()
+
+try:
+    from nltk.tokenize import word_tokenize
+except ImportError:
+    def word_tokenize(text: str):
+        return text.split()
+
+
+# BM25 globals; initialized lazily
+_bm25_index: BM25Okapi | None = None
+_bm25_metadatas: list[dict] = []
+_bm25_docs: list[str] = []
+
+def _build_bm25_index() -> None:
     """
     Build BM25 index from all docs in the Chroma collection.
-    Returns:
-      - BM25Okapi instance
-      - metadatas list (aligned with corpus)
-      - documents list (aligned with corpus)
+    Does nothing if there are no documents yet.
     """
-    all_docs = _collection.get(include=["documents", "metadatas"])
-    documents = all_docs["documents"]
-    metadatas = all_docs["metadatas"]
+    global _bm25_index, _bm25_metadatas, _bm25_docs
 
-    # Tokenize each document for BM25
+    all_docs = _collection.get(include=["documents", "metadatas"])
+    documents = all_docs.get("documents") or []
+    metadatas = all_docs.get("metadatas") or []
+
+    if not documents:
+        # No docs yet; leave BM25 index as None
+        _bm25_index = None
+        _bm25_metadatas = []
+        _bm25_docs = []
+        return
+
     tokenized_corpus = []
     for doc in documents:
-        # You can use a very simple tokenizer if you don't want nltk:
-        # tokens = doc.lower().split()
         tokens = word_tokenize(doc.lower())
         tokenized_corpus.append(tokens)
 
-    bm25 = BM25Okapi(tokenized_corpus)
-    return bm25, metadatas, documents
+    _bm25_index = BM25Okapi(tokenized_corpus)
+    _bm25_metadatas = metadatas
+    _bm25_docs = documents
 
 
-_bm25_index, _bm25_metadatas, _bm25_docs = _build_bm25_index()
-
+def ensure_bm25_index_built() -> None:
+    global _bm25_index
+    if _bm25_index is None:
+        _build_bm25_index()
 
 def get_collection():
     return _collection
@@ -96,21 +139,53 @@ def _dense_retrieve(
     return chunks
 
 
+# def _bm25_retrieve(
+#     query: str,
+#     n_results: int,
+# ) -> List[DocumentChunk]:
+#     """
+#     BM25 lexical retrieval over the full corpus.
+#     """
+#     if not _bm25_docs:
+#         return []
+
+#     # Tokenize query
+#     tokens = word_tokenize(query.lower())
+#     scores = _bm25_index.get_scores(tokens)
+
+#     # Take top n_results indices by score
+#     indexed_scores = list(enumerate(scores))
+#     indexed_scores.sort(key=lambda x: x[1], reverse=True)
+#     top_indices = indexed_scores[:n_results]
+
+#     results: List[DocumentChunk] = []
+#     for idx, score in top_indices:
+#         results.append(
+#             DocumentChunk(
+#                 id=str(idx),
+#                 text=_bm25_docs[idx],
+#                 score=float(score),
+#                 metadata=_bm25_metadatas[idx] or {},
+#             )
+#         )
+#     return results
+
 def _bm25_retrieve(
     query: str,
     n_results: int,
 ) -> List[DocumentChunk]:
     """
     BM25 lexical retrieval over the full corpus.
+    Returns an empty list if there are no documents.
     """
-    if not _bm25_docs:
+    ensure_bm25_index_built()
+
+    if _bm25_index is None or not _bm25_docs:
         return []
 
-    # Tokenize query
     tokens = word_tokenize(query.lower())
     scores = _bm25_index.get_scores(tokens)
 
-    # Take top n_results indices by score
     indexed_scores = list(enumerate(scores))
     indexed_scores.sort(key=lambda x: x[1], reverse=True)
     top_indices = indexed_scores[:n_results]
@@ -303,39 +378,85 @@ def generate_answer(
     return completion.choices[0].message.content.strip()
 
 
+# def rag_query(
+#     query: str,
+#     top_k: int = 5,
+#     where: Optional[Dict] = None,
+# ):
+#     """
+#     Full RAG pipeline:
+#     - hybrid retrieve (dense + BM25)
+#     - rerank
+#     - trim to top_k
+#     - enforce context token budget
+#     - generate answer
+#     """
+#     # Step 1: hybrid retrieval
+#     candidates = retrieve_hybrid(
+#         query,
+#         top_k=top_k,
+#         where=where,
+#         overfetch_factor=3,
+#         w_dense=0.7,
+#         w_bm25=0.3,
+#     )
+
+#     # Step 2: rerank
+#     reranked = rerank_chunks(query, candidates)
+
+#     # Step 3: take top_k after reranking
+#     final_chunks = reranked[:top_k]
+
+#     # Step 4: context token budget
+#     max_context_tokens = getattr(settings, "max_context_tokens", None)
+
+#     # Step 5: generate answer
+#     answer = generate_answer(query, final_chunks, max_context_tokens=max_context_tokens)
+#     return answer, final_chunks
 def rag_query(
     query: str,
     top_k: int = 5,
     where: Optional[Dict] = None,
+    retrieval_strategy: Optional[str] = None,
 ):
     """
     Full RAG pipeline:
-    - hybrid retrieve (dense + BM25)
+    - choose retrieval strategy (dense vs hybrid)
     - rerank
     - trim to top_k
     - enforce context token budget
     - generate answer
     """
-    # Step 1: hybrid retrieval
-    candidates = retrieve_hybrid(
-        query,
-        top_k=top_k,
-        where=where,
-        overfetch_factor=3,
-        w_dense=0.7,
-        w_bm25=0.3,
-    )
 
-    # Step 2: rerank
+    # Decide retrieval mode; default to hybrid to match your current behavior
+    strategy = retrieval_strategy or "hybrid"
+
+    if strategy == "dense":
+        # use only dense retrieval (no BM25)
+        candidates = _dense_retrieve(
+            query, n_results=max(top_k * 3, top_k), where=where
+        )
+    else:
+        # default: hybrid retrieval
+        candidates = retrieve_hybrid(
+            query,
+            top_k=top_k,
+            where=where,
+            overfetch_factor=3,
+            w_dense=0.7,
+            w_bm25=0.3,
+        )
+
+    # Rerank
     reranked = rerank_chunks(query, candidates)
 
-    # Step 3: take top_k after reranking
+    # Take top_k
     final_chunks = reranked[:top_k]
 
-    # Step 4: context token budget
+    # Context token budget
     max_context_tokens = getattr(settings, "max_context_tokens", None)
 
-    # Step 5: generate answer
+    # Generate answer
     answer = generate_answer(query, final_chunks, max_context_tokens=max_context_tokens)
     return answer, final_chunks
 

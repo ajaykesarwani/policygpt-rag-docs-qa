@@ -13,6 +13,8 @@ class QueryRequest(BaseModel):
     top_k: int = 5
     source_name: Optional[str] = None
     filename: Optional[str] = None
+    # for future extensibility, e.g. to support different retrieval strategies
+    retrieval_strategy: Optional[str] = None  # e.g. "dense" or "hybrid"
 
 class DocumentChunk(BaseModel):
     id: str
