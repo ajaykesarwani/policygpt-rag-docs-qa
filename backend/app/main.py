@@ -44,6 +44,7 @@ def ingest(req: IngestRequest, settings: Settings = Depends(get_settings)):
     result = ingest_texts(req.source_name, req.texts, req.metadata or {})
     return {"status": "ok", **result}
 
+
 # @app.post("/query", response_model=QueryResponse)
 # def query_rag(req: QueryRequest):
 #     where = None
@@ -60,9 +61,14 @@ def ingest(req: IngestRequest, settings: Settings = Depends(get_settings)):
 #     elif req.filename:
 #         where = {"filename": req.filename}
 #     else:
-#         where = None  # do not send an empty dict
+#         where = None
 
-#     answer, chunks = rag_query(req.query, top_k=req.top_k, where=where)
+#     answer, chunks = rag_query(
+#         req.query,
+#         top_k=req.top_k,
+#         where=where,
+#         retrieval_strategy=req.retrieval_strategy,  # NEW
+#     )
 #     return QueryResponse(answer=answer, context=chunks)
 
 @app.post("/query", response_model=QueryResponse)
@@ -83,14 +89,22 @@ def query_rag(req: QueryRequest):
     else:
         where = None
 
-    answer, chunks = rag_query(
+    answer, chunks, usage = rag_query(
         req.query,
         top_k=req.top_k,
         where=where,
-        retrieval_strategy=req.retrieval_strategy,  # NEW
+        retrieval_strategy=req.retrieval_strategy,
     )
-    return QueryResponse(answer=answer, context=chunks)
 
+    # Return answer, context, and usage metadata
+    return {
+        "answer": answer,
+        "context": chunks,
+        "prompt_tokens": usage.get("prompt_tokens", 0),
+        "completion_tokens": usage.get("completion_tokens", 0),
+        "total_tokens": usage.get("total_tokens", 0),
+        "cost_usd": usage.get("cost_usd", 0.0),
+    }
 
 # ... existing imports and app ...
 

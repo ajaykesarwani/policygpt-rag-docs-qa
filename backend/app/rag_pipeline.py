@@ -366,7 +366,11 @@ def generate_answer(
     query: str,
     context_chunks: List[DocumentChunk],
     max_context_tokens: Optional[int] = None,
-) -> str:
+):
+    """
+    Build a prompt from the context and query, call the LLM, and return
+    both the answer text and the raw completion object (for usage).
+    """
     prompt = build_prompt(query, context_chunks, max_context_tokens=max_context_tokens)
 
     completion = _llm_client.chat.completions.create(
@@ -375,44 +379,58 @@ def generate_answer(
         temperature=0.2,
         max_tokens=512,
     )
-    return completion.choices[0].message.content.strip()
+    answer_text = completion.choices[0].message.content.strip()
+    return answer_text, completion
 
 
 # def rag_query(
 #     query: str,
 #     top_k: int = 5,
 #     where: Optional[Dict] = None,
+#     retrieval_strategy: Optional[str] = None,
 # ):
 #     """
 #     Full RAG pipeline:
-#     - hybrid retrieve (dense + BM25)
+#     - choose retrieval strategy (dense vs hybrid)
 #     - rerank
 #     - trim to top_k
 #     - enforce context token budget
 #     - generate answer
 #     """
-#     # Step 1: hybrid retrieval
-#     candidates = retrieve_hybrid(
-#         query,
-#         top_k=top_k,
-#         where=where,
-#         overfetch_factor=3,
-#         w_dense=0.7,
-#         w_bm25=0.3,
-#     )
 
-#     # Step 2: rerank
+#     # Decide retrieval mode; default to hybrid to match your current behavior
+#     strategy = retrieval_strategy or "hybrid"
+
+#     if strategy == "dense":
+#         # use only dense retrieval (no BM25)
+#         candidates = _dense_retrieve(
+#             query, n_results=max(top_k * 3, top_k), where=where
+#         )
+#     else:
+#         # default: hybrid retrieval
+#         candidates = retrieve_hybrid(
+#             query,
+#             top_k=top_k,
+#             where=where,
+#             overfetch_factor=3,
+#             w_dense=0.7,
+#             w_bm25=0.3,
+#         )
+
+#     # Rerank
 #     reranked = rerank_chunks(query, candidates)
 
-#     # Step 3: take top_k after reranking
+#     # Take top_k
 #     final_chunks = reranked[:top_k]
 
-#     # Step 4: context token budget
+#     # Context token budget
 #     max_context_tokens = getattr(settings, "max_context_tokens", None)
 
-#     # Step 5: generate answer
+#     # Generate answer
 #     answer = generate_answer(query, final_chunks, max_context_tokens=max_context_tokens)
 #     return answer, final_chunks
+
+
 def rag_query(
     query: str,
     top_k: int = 5,
@@ -426,9 +444,10 @@ def rag_query(
     - trim to top_k
     - enforce context token budget
     - generate answer
+    - compute token usage and cost
     """
 
-    # Decide retrieval mode; default to hybrid to match your current behavior
+    # Decide retrieval mode; default to hybrid
     strategy = retrieval_strategy or "hybrid"
 
     if strategy == "dense":
@@ -456,9 +475,29 @@ def rag_query(
     # Context token budget
     max_context_tokens = getattr(settings, "max_context_tokens", None)
 
-    # Generate answer
-    answer = generate_answer(query, final_chunks, max_context_tokens=max_context_tokens)
-    return answer, final_chunks
+    # Generate answer (get both text and completion for usage)
+    answer, completion = generate_answer(
+        query, final_chunks, max_context_tokens=max_context_tokens
+    )
+
+    # ---- Token usage and cost ----
+    usage = getattr(completion, "usage", None)
+    prompt_tokens = usage.prompt_tokens if usage else 0
+    completion_tokens = usage.completion_tokens if usage else 0
+    total_tokens = prompt_tokens + completion_tokens
+
+    # Example pricing: replace with your actual price per 1k tokens
+    PRICE_PER_1K = 0.59  # USD per 1k tokens (example only)
+    cost_usd = (total_tokens / 1000.0) * PRICE_PER_1K
+
+    usage_info = {
+        "prompt_tokens": prompt_tokens,
+        "completion_tokens": completion_tokens,
+        "total_tokens": total_tokens,
+        "cost_usd": cost_usd,
+    }
+
+    return answer, final_chunks, usage_info
 
 def reset_vector_store():
     """
