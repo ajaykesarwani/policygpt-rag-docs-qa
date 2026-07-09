@@ -3,27 +3,28 @@
 End-to-end Retrieval-Augmented Generation (RAG) system for asking grounded questions over large document sets (e.g., policies, manuals, internal docs).
 
 - **Backend**: FastAPI, ChromaDB, local SentenceTransformers embeddings, Groq LLMs
-- **Frontend**: Next.js (App Router) with a modern UI, designed for Vercel or local dev
+- **Frontend**: Next.js (App Router) with a modern custom UI, designed for Vercel or local dev
 - **RAG pipeline**:
   - Text ingestion and chunking
   - Hybrid retrieval (BM25 + dense vectors)
   - Metadata filters
+  - Conversational memory query decontextualization (rewrites follow-up queries based on history)
   - LLM-based reranking
   - Context-window-aware prompt construction
-  - Answer generation with visible context
+  - Real-time token streaming with metadata (context and usage costs)
 
 ---
 
 ## Features
 
-- Upload PDFs or TXT files directly from the UI
-- Ingest arbitrary text under logical `source_name` values
-- Hybrid retrieval: combine semantic vectors with BM25 keyword search for stronger recall
-- Metadata filters by `source_name` / filename
-- LLM-based reranking of retrieved chunks
-- Context window control via a configurable token budget
-- Simple “Reset knowledge” admin button to clear the vector store
-- Evaluation script that measures retrieval recall and answer faithfulness on a labeled test set
+- **Multi-Turn Chat**: Complete conversational memory. Follow-up queries are dynamically rewritten using history into self-contained search queries before retrieval.
+- **Low-Latency Streaming**: Answers are streamed token-by-token. Citation/context chunks load instantly at the start of the query.
+- **Cost & Token Tracking**: Displays prompt/completion token metrics and computed USD cost for each message.
+- **Modern UI/UX**: Custom dark-themed layout with scrolling bubbles, avatar icons, skeletons, typing effects, and clear-chat triggers.
+- **Upload PDFs or TXT**: Direct document ingestion from the UI.
+- **Hybrid Retrieval**: Combines semantic vectors with local BM25 keyword search.
+- **LLM-Based Reranking**: Re-orders candidate documents before LLM generation.
+- **Evaluation Framework**: A corrected testing script (`eval_rag.py`) to measure context recall and answer faithfulness.
 
 ---
 
@@ -76,20 +77,15 @@ Open: http://localhost:3000
 
 2. **Ask a question**
 
-   - In the chat input, ask something like:
-     - “What does our vacation policy say about carry-over days?”
-   - The backend:
-     - Runs hybrid retrieval (BM25 + dense vectors)
-     - Applies metadata filters if provided
-     - Reranks candidates with the LLM
-     - Builds a prompt within the context token budget
-     - Calls Groq’s LLM to generate an answer
+   - Ask a question (e.g., “What does our vacation policy say about carry-over days?”).
+   - Backend checks history, rewrites it if it's a follow-up, runs hybrid retrieval, reranks with the LLM, and streams the answer using line-delimited NDJSON.
 
-3. **Inspect context**
+3. **Inspect context & usage**
 
-   - The UI shows:
-     - The answer
-     - The retrieved chunks with `source`, `filename`, `score`, and text
+   - The chat bubbles immediately display:
+     - The streaming response
+     - The retrieved chunks (score, filename, source, and text)
+     - Total tokens used and calculated query cost in USD.
 
 4. **Reset knowledge (for dev)**
 
