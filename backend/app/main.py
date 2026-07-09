@@ -1,12 +1,14 @@
 from fastapi import FastAPI, Depends, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pypdf import PdfReader
 import io
+import json
 
 from .config import Settings, get_settings
 from .models import IngestRequest, QueryRequest, QueryResponse, DocumentChunk
 from .ingestion import ingest_texts
-from .rag_pipeline import rag_query
+from .rag_pipeline import rag_query, rag_query_stream
 from .logging_config import configure_logging
 from .rag_pipeline import reset_vector_store
 
@@ -71,7 +73,7 @@ def ingest(req: IngestRequest, settings: Settings = Depends(get_settings)):
 #     )
 #     return QueryResponse(answer=answer, context=chunks)
 
-@app.post("/query", response_model=QueryResponse)
+@app.post("/query")
 def query_rag(req: QueryRequest):
     where = None
 
@@ -89,22 +91,20 @@ def query_rag(req: QueryRequest):
     else:
         where = None
 
-    answer, chunks, usage = rag_query(
-        req.query,
-        top_k=req.top_k,
-        where=where,
-        retrieval_strategy=req.retrieval_strategy,
-    )
+    def stream_generator():
+        try:
+            for step in rag_query_stream(
+                query=req.query,
+                history=req.history,
+                top_k=req.top_k,
+                where=where,
+                retrieval_strategy=req.retrieval_strategy,
+            ):
+                yield json.dumps(step) + "\n"
+        except Exception as e:
+            yield json.dumps({"type": "error", "message": str(e)}) + "\n"
 
-    # Return answer, context, and usage metadata
-    return {
-        "answer": answer,
-        "context": chunks,
-        "prompt_tokens": usage.get("prompt_tokens", 0),
-        "completion_tokens": usage.get("completion_tokens", 0),
-        "total_tokens": usage.get("total_tokens", 0),
-        "cost_usd": usage.get("cost_usd", 0.0),
-    }
+    return StreamingResponse(stream_generator(), media_type="application/x-ndjson")
 
 # ... existing imports and app ...
 

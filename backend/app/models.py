@@ -8,8 +8,14 @@ class IngestRequest(BaseModel):
     metadata: Optional[dict] = Field(default_factory=dict)
 
 
+class ChatMessage(BaseModel):
+    role: str  # "user" or "assistant"
+    content: str
+
+
 class QueryRequest(BaseModel):
     query: str
+    history: Optional[List[ChatMessage]] = None
     top_k: int = 5
     source_name: Optional[str] = None
     filename: Optional[str] = None

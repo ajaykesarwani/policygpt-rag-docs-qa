@@ -135,7 +135,7 @@ def run_eval(path: str, top_k: int = 5):
     for ex in eval_set:
         print(f"Evaluating example {ex.id}...")
 
-        answer, chunks = rag_query(
+        answer, chunks, _ = rag_query(
             ex.question,
             top_k=top_k,
             where=ex.where,

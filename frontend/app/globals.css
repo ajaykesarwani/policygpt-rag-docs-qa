@@ -308,31 +308,180 @@ body {
 
 /* Chat area */
 
-.chat-answer {
+.chat-thread {
+  max-height: 450px;
+  overflow-y: auto;
+  margin-bottom: 16px;
+  padding-right: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Custom scrollbar for chat thread */
+.chat-thread::-webkit-scrollbar {
+  width: 6px;
+}
+.chat-thread::-webkit-scrollbar-track {
+  background: transparent;
+}
+.chat-thread::-webkit-scrollbar-thumb {
+  background: var(--border-subtle);
+  border-radius: 3px;
+}
+.chat-thread::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+.chat-thread__empty {
+  text-align: center;
+  padding: 40px 16px;
+  color: var(--text-muted);
+  font-size: 13px;
+  border: 1px dashed var(--border-subtle);
   border-radius: var(--radius-md);
-  border: 1px solid rgba(148, 163, 184, 0.22);
-  background: #020617;
-  padding: 10px 11px;
-  font-size: 12px;
-  line-height: 1.6;
+  background: rgba(15, 23, 42, 0.3);
+}
+
+.chat-bubble-container {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  max-width: 90%;
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.chat-bubble-container.user {
+  margin-left: auto;
+  flex-direction: row-reverse;
+}
+
+.chat-bubble-container.assistant {
+  margin-right: auto;
+}
+
+.chat-bubble__avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: bold;
+  flex-shrink: 0;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+.chat-bubble-container.user .chat-bubble__avatar {
+  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+  color: white;
+}
+
+.chat-bubble-container.assistant .chat-bubble__avatar {
+  background: rgba(148, 163, 184, 0.15);
+  color: var(--accent);
+  border: 1px solid var(--border-subtle);
+}
+
+.chat-bubble__content {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 100%;
+}
+
+.chat-bubble__message {
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-size: 12.5px;
+  line-height: 1.55;
   white-space: pre-wrap;
+  word-break: break-word;
+  box-shadow: var(--shadow-soft);
+}
+
+.chat-bubble-container.user .chat-bubble__message {
+  background: var(--accent-soft);
+  color: var(--text-main);
+  border: 1px solid rgba(99, 102, 241, 0.25);
+  border-top-right-radius: 2px;
+}
+
+.chat-bubble-container.assistant .chat-bubble__message {
+  background: var(--bg-elevated);
+  color: var(--text-main);
+  border: 1px solid var(--border-subtle);
+  border-top-left-radius: 2px;
+}
+
+.chat-bubble__loading {
+  color: var(--text-muted);
+  font-style: italic;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.chat-bubble__loading::after {
+  content: "...";
+  animation: dots 1.2s infinite;
+  width: 1em;
+  text-align: left;
+}
+
+@keyframes dots {
+  0%, 20% { content: "."; }
+  40% { content: ".."; }
+  60%, 100% { content: "..."; }
+}
+
+.chat-bubble__usage {
+  font-size: 9.5px;
+  color: var(--text-muted);
+  padding: 0 4px;
 }
 
 .chat-context {
-  margin-top: 12px;
+  margin-top: 8px;
+  background: rgba(15, 23, 42, 0.4);
+  padding: 10px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  max-width: 100%;
 }
 
-.chat-context__item {
-  border-radius: 10px;
-  border: 1px solid rgba(30, 64, 175, 0.3);
-  background: rgba(15, 23, 42, 0.8);
-  padding: 6px 8px;
-  font-size: 11px;
+.chat-context__label {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--text-muted);
   margin-bottom: 6px;
 }
 
+.chat-context__list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.chat-context__item {
+  border-radius: 8px;
+  border: 1px solid rgba(99, 102, 241, 0.15);
+  background: rgba(15, 23, 42, 0.7);
+  padding: 8px 10px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-main);
+}
+
 .chat-context__meta {
-  font-size: 10px;
-  color: var(--text-muted);
+  font-size: 9.5px;
+  color: var(--accent);
+  font-family: monospace;
   margin-bottom: 4px;
 }

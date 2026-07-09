@@ -1,10 +1,9 @@
 from typing import List, Dict, Optional, Tuple
-
 from chromadb import PersistentClient
 from openai import OpenAI
 from rank_bm25 import BM25Okapi  # new
 from .config import get_settings
-from .models import DocumentChunk
+from .models import DocumentChunk, ChatMessage
 from .local_embeddings import LocalEmbeddingFunction
 
 settings = get_settings()
@@ -514,3 +513,139 @@ def reset_vector_store():
         name="documents",
         embedding_function=_embedding_fn,
     )
+
+
+def decontextualize_query(query: str, history: List[ChatMessage]) -> str:
+    """
+    Given a user's latest query and the chat history, rewrite the query to be a standalone,
+    self-contained question suitable for RAG retrieval.
+    """
+    if not history:
+        return query
+
+    history_lines = []
+    for msg in history:
+        role_label = "User" if msg.role == "user" else "Assistant"
+        history_lines.append(f"{role_label}: {msg.content}")
+    history_block = "\n".join(history_lines)
+
+    rewrite_prompt = f"""
+You are an AI assistant. Given the following conversation history and the user's latest follow-up question, your task is to rewrite the follow-up question into a standalone, fully self-contained question (in English). 
+
+The standalone question should include all necessary context from the conversation history so that it can be answered correctly via a document search without needing the conversation history.
+
+Rules:
+1. Do NOT answer the question.
+2. Return ONLY the rewritten standalone question.
+3. If the user's query is already a standalone question or does not rely on history, return the original query exactly.
+
+Conversation History:
+{history_block}
+
+User's Follow-up Question:
+{query}
+
+Standalone Question:
+"""
+
+    try:
+        completion = _llm_client.chat.completions.create(
+            model=settings.llm_model,
+            messages=[{"role": "user", "content": rewrite_prompt}],
+            temperature=0.0,
+            max_tokens=256,
+        )
+        rewritten = completion.choices[0].message.content.strip()
+        if rewritten.startswith('"') and rewritten.endswith('"'):
+            rewritten = rewritten[1:-1]
+        return rewritten if rewritten else query
+    except Exception as e:
+        print(f"Error rewriting query: {e}")
+        return query
+
+
+def rag_query_stream(
+    query: str,
+    history: Optional[List[ChatMessage]] = None,
+    top_k: int = 5,
+    where: Optional[Dict] = None,
+    retrieval_strategy: Optional[str] = None,
+):
+    """
+    Generator for the RAG pipeline.
+    Yields stages:
+    1. {"type": "context", "context": [...]}
+    2. {"type": "token", "content": "..."}
+    3. {"type": "usage", "prompt_tokens": ..., "completion_tokens": ..., "total_tokens": ..., "cost_usd": ...}
+    """
+    history = history or []
+    search_query = decontextualize_query(query, history)
+
+    strategy = retrieval_strategy or "hybrid"
+    if strategy == "dense":
+        candidates = _dense_retrieve(
+            search_query, n_results=max(top_k * 3, top_k), where=where
+        )
+    else:
+        candidates = retrieve_hybrid(
+            search_query,
+            top_k=top_k,
+            where=where,
+            overfetch_factor=3,
+            w_dense=0.7,
+            w_bm25=0.3,
+        )
+
+    reranked = rerank_chunks(search_query, candidates)
+    final_chunks = reranked[:top_k]
+
+    yield {
+        "type": "context",
+        "context": [c.dict() for c in final_chunks]
+    }
+
+    max_context_tokens = getattr(settings, "max_context_tokens", None)
+    prompt = build_prompt(search_query, final_chunks, max_context_tokens=max_context_tokens)
+
+    stream = _llm_client.chat.completions.create(
+        model=settings.llm_model,
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.2,
+        max_tokens=512,
+        stream=True,
+        stream_options={"include_usage": True}
+    )
+
+    full_answer = []
+    usage_info = None
+
+    for chunk in stream:
+        delta = chunk.choices[0].delta if chunk.choices else None
+        token = delta.content if delta else None
+        if token:
+            full_answer.append(token)
+            yield {
+                "type": "token",
+                "content": token
+            }
+        if hasattr(chunk, "usage") and chunk.usage is not None:
+            usage_info = chunk.usage
+
+    if usage_info:
+        prompt_tokens = usage_info.prompt_tokens
+        completion_tokens = usage_info.completion_tokens
+    else:
+        prompt_tokens = estimate_tokens(prompt)
+        completion_tokens = estimate_tokens("".join(full_answer))
+
+    total_tokens = prompt_tokens + completion_tokens
+    PRICE_PER_1K = 0.59
+    cost_usd = (total_tokens / 1000.0) * PRICE_PER_1K
+
+    yield {
+        "type": "usage",
+        "prompt_tokens": prompt_tokens,
+        "completion_tokens": completion_tokens,
+        "total_tokens": total_tokens,
+        "cost_usd": cost_usd
+    }

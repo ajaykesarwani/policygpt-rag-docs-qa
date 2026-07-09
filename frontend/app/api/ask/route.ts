@@ -1,4 +1,4 @@
-﻿import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:8000";
 
@@ -12,21 +12,19 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify(body),
     });
 
-    const contentType = resp.headers.get("content-type") || "";
-    const rawText = await resp.text();
-
-    let data: any;
-    if (contentType.includes("application/json")) {
-      try {
-        data = JSON.parse(rawText);
-      } catch {
-        data = { message: rawText };
-      }
-    } else {
-      data = { message: rawText };
+    if (!resp.ok) {
+      const rawText = await resp.text();
+      return new Response(rawText, { status: resp.status, headers: { "Content-Type": "application/json" } });
     }
 
-    return NextResponse.json(data, { status: resp.status });
+    return new Response(resp.body, {
+      status: resp.status,
+      headers: {
+        "Content-Type": "application/x-ndjson",
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
+      },
+    });
   } catch (err: any) {
     return NextResponse.json(
       { detail: err?.message || "Unexpected error in /api/ask" },
