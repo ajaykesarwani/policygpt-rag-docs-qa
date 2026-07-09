@@ -97,30 +97,33 @@ export default function Chat() {
             const data = JSON.parse(line);
             if (data.type === "context") {
               setMessages((prev) => {
-                const updated = [...prev];
-                const last = updated[updated.length - 1];
+                if (prev.length === 0) return prev;
+                const last = prev[prev.length - 1];
                 if (last && last.role === "assistant") {
-                  last.context = data.context;
+                  const updatedLast = { ...last, context: data.context };
+                  return [...prev.slice(0, -1), updatedLast];
                 }
-                return updated;
+                return prev;
               });
             } else if (data.type === "token") {
               setMessages((prev) => {
-                const updated = [...prev];
-                const last = updated[updated.length - 1];
+                if (prev.length === 0) return prev;
+                const last = prev[prev.length - 1];
                 if (last && last.role === "assistant") {
-                  last.content += data.content;
+                  const updatedLast = { ...last, content: last.content + data.content };
+                  return [...prev.slice(0, -1), updatedLast];
                 }
-                return updated;
+                return prev;
               });
             } else if (data.type === "usage") {
               setMessages((prev) => {
-                const updated = [...prev];
-                const last = updated[updated.length - 1];
+                if (prev.length === 0) return prev;
+                const last = prev[prev.length - 1];
                 if (last && last.role === "assistant") {
-                  last.usage = data;
+                  const updatedLast = { ...last, usage: data };
+                  return [...prev.slice(0, -1), updatedLast];
                 }
-                return updated;
+                return prev;
               });
             } else if (data.type === "error") {
               setError(data.message);
